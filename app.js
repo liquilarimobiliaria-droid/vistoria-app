@@ -16,7 +16,7 @@ import * as Cont from './contestar.js';
 import * as Fluxo from './fluxo.js';
 import * as Push from './push.js';
 
-const VERSAO = '3.6';
+const VERSAO = '3.7';
 S.versao = VERSAO;
 
 /* ---------- roteador ---------- */
@@ -502,6 +502,8 @@ function viewCfg() {
         <button class="btn" data-act="camTeste">Testar câmera</button>
         <p class="muted">Teste de captura: segure o aparelho <b>deitado</b> (como ao fotografar) e aponte para algo. Tira fotos de teste em várias resoluções e mostra tempo, tamanho e a imagem.</p>
         <button class="btn" data-act="camTeste2">Teste de captura (fotos)</button>
+        <p class="muted">Teste de lentes: mostra cada câmera traseira e o zoom que o navegador oferece, com uma imagem de cada. Compare com a câmera do celular (0,5× / 1× / 2×).</p>
+        <button class="btn" data-act="camLentes">Teste de lentes (0,5× / 1× / 2×)</button>
         <pre id="camrel" class="muted" style="white-space:pre-wrap;font-size:12px"></pre>
         <div id="camfotos" style="display:flex;flex-wrap:wrap;gap:8px"></div></div>
       <h2>Passeio guiado</h2>
@@ -878,6 +880,32 @@ const ACTS = {
         s.getTracks().forEach((t) => t.stop());
       } catch (e) { L.push(`pedido ${w}x${h} → erro ${e.name}`); }
     }
+    box.textContent = L.join('\n');
+  },
+  async camLentes() { // uma imagem por lente/zoom: serve para descobrir qual lente o navegador entrega em cada botão
+    const box = document.getElementById('camrel'), gal = document.getElementById('camfotos'); if (!box || !gal) return;
+    gal.innerHTML = ''; const L = [`Tela: ${screen.orientation?.type} · janela ${innerWidth}x${innerHeight}`];
+    box.textContent = 'Testando lentes… (aponte para algo parado, aparelho deitado)';
+    const mini = (v, legenda) => { const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0); c.style.cssText = 'width:100%;border:1px solid #888'; const f = document.createElement('figure'); f.style.cssText = 'margin:0;width:46%'; const g = document.createElement('figcaption'); g.style.fontSize = '11px'; g.textContent = legenda; f.append(c, g); gal.append(f); };
+    const abrir = async (video) => { const s = await navigator.mediaDevices.getUserMedia({ video }); const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = s; await v.play().catch(() => {}); await new Promise((r) => setTimeout(r, 900)); return { s, v, t: s.getVideoTracks()[0] }; };
+    try {
+      let ds = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+      if (!ds.some((d) => d.label)) { const t = await abrir({ facingMode: { ideal: 'environment' } }); t.s.getTracks().forEach((x) => x.stop()); ds = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput'); }
+      L.push(`Câmeras: ${ds.map((d) => d.label || '(sem nome)').join(' | ')}`);
+      const fmt = (z) => (z ? `${z.min}–${z.max}` : 'sem zoom');
+      for (const d of ds) {
+        let r; try { r = await abrir({ deviceId: { exact: d.deviceId }, width: { ideal: 1920 }, height: { ideal: 1440 } }); } catch (e) { L.push(`${d.label}: erro ${e.name}`); continue; }
+        const caps = r.t.getCapabilities?.() || {}, st = r.t.getSettings();
+        L.push(`• ${d.label}: ${st.width}x${st.height}, faixa de zoom ${fmt(caps.zoom)}, zoom atual ${st.zoom ?? '—'}`);
+        mini(r.v, `${d.label} (zoom ${st.zoom ?? '—'})`);
+        if (caps.zoom && /back|traseira|rear/i.test(d.label)) {
+          for (const z of [0.5, 1, 2, 3].filter((x) => x >= caps.zoom.min - 0.001 && x <= caps.zoom.max + 0.001 && x !== st.zoom)) {
+            try { await r.t.applyConstraints({ advanced: [{ zoom: z }] }); await new Promise((q) => setTimeout(q, 600)); mini(r.v, `${d.label} · zoom ${z} (pedido) → ${r.t.getSettings().zoom ?? '—'}`); } catch (e) { L.push(`   zoom ${z}: erro ${e.name}`); }
+          }
+        }
+        r.s.getTracks().forEach((x) => x.stop());
+      }
+    } catch (e) { L.push('erro: ' + e.name + ' ' + e.message); }
     box.textContent = L.join('\n');
   },
   async camTeste2() { // tira fotos de teste em resoluções diferentes: tempo, tamanho, dimensões e a imagem (orientação visível)

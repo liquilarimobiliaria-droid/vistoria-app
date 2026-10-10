@@ -113,13 +113,13 @@ async function setarZoom(z, silencioso = false) {
   const zc = P.caps.zoom;
   try {
     if (z < 1) {
-      if (zc && zc.min <= z + 0.05) {                       // zoom óptico < 1 exposto pelo navegador
+      if (P.lentes.uw) {                                    // lente ultra-angular separada (preferida: é a ultra-angular de verdade)
+        if (P.lente !== 'uw') await trocarLente('uw');
+        P.zoomSel = 0.5; P.digital = 1;
+      } else if (zc && zc.min <= z + 0.05) {                // zoom óptico < 1 exposto pelo navegador
         if (P.lente !== 'main') await trocarLente('main');
         await P.track.applyConstraints({ advanced: [{ zoom: Math.max(z, zc.min) }] });
         P.zoomSel = z; P.digital = 1;
-      } else if (P.lentes.uw) {                             // lente ultra-angular separada
-        if (P.lente !== 'uw') await trocarLente('uw');
-        P.zoomSel = 0.5; P.digital = 1;
       } else {
         P.zoomSel = 1;
         if (!silencioso) toast('0,5× não está disponível neste aparelho pelo navegador. Para a ultra-angular, use "Câmera do celular".', 5000);
@@ -625,14 +625,16 @@ function renderBottom() {
   const ms = midiaDoItem(it.id);
   const gravando = !!P.rec;
   if (cfg.rapido) { // modo rápido: só a câmera. Nome do item no topo; aqui só o disparo e a navegação
+    // câmera em tela cheia: controles pequenos sobrepostos na faixa de baixo da imagem
     bot.innerHTML = `
       ${P.camErro ? `<div class="aviso">${esc(P.camErro)}</div>` : ''}
-      <div class="cthumbs">${ms.slice(-4).map((f) => `<span class="thw"><img class="th" src="${thumbURL(f)}" alt="">${f.vertical ? '<i class="vert">⚠</i>' : ''}</span>`).join('')}${ms.length ? `<small>${ms.length}</small>` : ''}${P.pend[it.id] ? '<small class="aviso-s">…</small>' : ''}</div>
-      <div class="cshut"><button class="shutter ${P.modoVideo ? 'vid' : ''} ${gravando ? 'rec' : ''}" data-p="shutter" aria-label="Fotografar">${gravando ? '■' : ''}</button></div>
-      <div class="cctl3">
-        <button class="cbig" data-p="voltar" ${P.i === 0 ? 'disabled' : ''}>‹</button>
-        <button class="cbig na" data-p="na">Não tem</button>
-        <button class="cbig" data-p="proximo">Próximo ›</button>
+      <div class="rap">
+        <div class="rl">
+          <div class="cthumbs">${ms.slice(-3).map((f) => `<span class="thw"><img class="th" src="${thumbURL(f)}" alt="">${f.vertical ? '<i class="vert">⚠</i>' : ''}</span>`).join('')}${ms.length ? `<small>${ms.length}</small>` : ''}${P.pend[it.id] ? '<small class="aviso-s">…</small>' : ''}</div>
+          <div class="rb"><button class="rbtn" data-p="voltar" ${P.i === 0 ? 'disabled' : ''}>‹ Voltar</button><button class="rbtn na" data-p="na">Não tem</button></div>
+        </div>
+        <button class="shutter ${P.modoVideo ? 'vid' : ''} ${gravando ? 'rec' : ''}" data-p="shutter" aria-label="Fotografar">${gravando ? '■' : ''}</button>
+        <div class="rr"><button class="rbtn pr" data-p="proximo">Próximo ›</button></div>
       </div>`;
     return;
   }
