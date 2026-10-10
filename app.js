@@ -16,7 +16,7 @@ import * as Cont from './contestar.js';
 import * as Fluxo from './fluxo.js';
 import * as Push from './push.js';
 
-const VERSAO = '3.4';
+const VERSAO = '3.5';
 S.versao = VERSAO;
 
 /* ---------- roteador ---------- */
@@ -495,7 +495,10 @@ function viewCfg() {
       <div class="card"><b>🔬 Diagnóstico da câmera</b>
         <p class="muted">Mostra a resolução que este aparelho entrega à câmera do app. Toque e envie a captura da tela para o suporte.</p>
         <button class="btn" data-act="camTeste">Testar câmera</button>
-        <pre id="camrel" class="muted" style="white-space:pre-wrap;font-size:12px"></pre></div>
+        <p class="muted">Teste de captura: segure o aparelho <b>deitado</b> (como ao fotografar) e aponte para algo. Tira fotos de teste em várias resoluções e mostra tempo, tamanho e a imagem.</p>
+        <button class="btn" data-act="camTeste2">Teste de captura (fotos)</button>
+        <pre id="camrel" class="muted" style="white-space:pre-wrap;font-size:12px"></pre>
+        <div id="camfotos" style="display:flex;flex-wrap:wrap;gap:8px"></div></div>
       <h2>Passeio guiado</h2>
       <label class="chk"><input type="checkbox" data-chg="cfgFalar" ${cfg.falar ? 'checked' : ''}> Ler o roteiro em voz alta</label>
       <div class="card"><b>🔊 Voz do roteiro</b>
@@ -869,6 +872,34 @@ const ACTS = {
         L.push(`pedido ${w}x${h} → fluxo ${st.width}x${st.height}, vídeo ${v.videoWidth}x${v.videoHeight}, ${Math.round(st.frameRate || 0)} fps`);
         s.getTracks().forEach((t) => t.stop());
       } catch (e) { L.push(`pedido ${w}x${h} → erro ${e.name}`); }
+    }
+    box.textContent = L.join('\n');
+  },
+  async camTeste2() { // tira fotos de teste em resoluções diferentes: tempo, tamanho, dimensões e a imagem (orientação visível)
+    const box = document.getElementById('camrel'), gal = document.getElementById('camfotos'); if (!box || !gal) return;
+    gal.innerHTML = ''; const L = [`Tela: ${screen.orientation?.type} · ${screen.width}x${screen.height} · janela ${innerWidth}x${innerHeight}`];
+    box.textContent = 'Testando… (mantenha o aparelho deitado e parado)';
+    const miniatura = (blob, legenda) => { const f = document.createElement('figure'); f.style.cssText = 'margin:0;width:46%'; const i = document.createElement('img'); i.src = URL.createObjectURL(blob); i.style.cssText = 'width:100%;border:1px solid #888'; const c = document.createElement('figcaption'); c.style.fontSize = '11px'; c.textContent = legenda; f.append(i, c); gal.append(f); };
+    for (const [w, h] of [[1920, 1080], [3840, 2160], [4032, 3024]]) {
+      let s;
+      try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h } } }); } catch (e) { L.push(`${w}x${h}: erro ${e.name}`); continue; }
+      try {
+        const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = s; await v.play().catch(() => {}); await new Promise((r) => setTimeout(r, 1200));
+        const tempos = []; let blob;
+        for (let i = 0; i < 3; i++) {
+          const t0 = performance.now(), c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+          c.getContext('2d').drawImage(v, 0, 0); blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9)); tempos.push(performance.now() - t0);
+        }
+        L.push(`${w}x${h}: quadro ${v.videoWidth}x${v.videoHeight}, ${Math.round(tempos.reduce((a, b) => a + b) / 3)} ms por foto, ${Math.round(blob.size / 1024)} KB`);
+        miniatura(blob, `quadro ${v.videoWidth}x${v.videoHeight}`);
+        if (typeof ImageCapture !== 'undefined') {
+          try {
+            const t0 = performance.now(), pb = await new ImageCapture(s.getVideoTracks()[0]).takePhoto(), dt = performance.now() - t0;
+            const bm = await createImageBitmap(pb, { imageOrientation: 'from-image' });
+            L.push(`   takePhoto: ${bm.width}x${bm.height}, ${Math.round(dt)} ms, ${Math.round(pb.size / 1024)} KB`); miniatura(pb, `takePhoto ${bm.width}x${bm.height}`);
+          } catch (e) { L.push(`   takePhoto: erro ${e.name}`); }
+        }
+      } finally { s.getTracks().forEach((t) => t.stop()); }
     }
     box.textContent = L.join('\n');
   },
