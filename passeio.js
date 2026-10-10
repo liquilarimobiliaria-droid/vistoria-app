@@ -71,6 +71,13 @@ async function iniciarCamera(comAudio = false, deviceId = null, manterZoom = fal
     P.camOk = true; P.camErro = ''; P.torch = false; P.digital = 1; P.cv.style.transform = '';
     if (!deviceId && !P.mainId) P.mainId = P.track.getSettings?.().deviceId || null;
     await descobrirLentes();
+    // iPhone: a câmera "virtual" (Tripla/Dupla) oferece zoom contínuo 0,5×–10× numa única câmera, como o app nativo.
+    // É a que o navegador deve usar: 0,5× = ultra-angular, 1× = principal, 2×/3× = zoom óptico/recorte.
+    if (!deviceId && P.lentes.virt && P.track.getSettings?.().deviceId !== P.lentes.virt && !P.virtTentada) {
+      P.virtTentada = true;
+      P.mainId = P.lentes.virt;
+      return iniciarCamera(comAudio, P.lentes.virt, manterZoom);
+    }
     if (!manterZoom) await setarZoom(P.zoomSel, true);
   } catch (e) {
     P.camOk = false;
@@ -95,6 +102,7 @@ async function descobrirLentes() {
     P.lentes = {
       uw: costas.find((d) => /ultra/i.test(d.label))?.deviceId || null,
       tele: costas.find((d) => /tele/i.test(d.label))?.deviceId || null,
+      virt: (costas.find((d) => /tripl|triple/i.test(d.label)) || costas.find((d) => /dupla grande|dual wide|dual camera|dupla/i.test(d.label) && /grande|wide/i.test(d.label)))?.deviceId || null,
       n: costas.length,
     };
   } catch { /* sem lista de dispositivos */ }
@@ -113,13 +121,13 @@ async function setarZoom(z, silencioso = false) {
   const zc = P.caps.zoom;
   try {
     if (z < 1) {
-      if (P.lentes.uw) {                                    // lente ultra-angular separada (preferida: é a ultra-angular de verdade)
-        if (P.lente !== 'uw') await trocarLente('uw');
-        P.zoomSel = 0.5; P.digital = 1;
-      } else if (zc && zc.min <= z + 0.05) {                // zoom óptico < 1 exposto pelo navegador
+      if (zc && zc.min <= z + 0.05) {                       // zoom óptico < 1 exposto pelo navegador (câmera virtual do iPhone)
         if (P.lente !== 'main') await trocarLente('main');
         await P.track.applyConstraints({ advanced: [{ zoom: Math.max(z, zc.min) }] });
         P.zoomSel = z; P.digital = 1;
+      } else if (P.lentes.uw) {                             // lente ultra-angular separada
+        if (P.lente !== 'uw') await trocarLente('uw');
+        P.zoomSel = 0.5; P.digital = 1;
       } else {
         P.zoomSel = 1;
         if (!silencioso) toast('0,5× não está disponível neste aparelho pelo navegador. Para a ultra-angular, use "Câmera do celular".', 5000);
@@ -816,7 +824,7 @@ export async function abrir() {
   P.aberto = true;
   S.pausarSync = true; // o envio de fotos à nuvem espera: a câmera tem prioridade
   P.lista = false; P.mostrarCampos = false; P.ultimaAmb = null; P.modoVideo = false; P.gate = true; P.avisoVoz = false;
-  P.perg = null; P.extra = null; P.perguntado = {}; P.trans = null; P.aiAtual = -1; P.zoomSel = 0.5; P.lente = 'main'; P.mainId = null;
+  P.perg = null; P.extra = null; P.perguntado = {}; P.trans = null; P.aiAtual = -1; P.zoomSel = 0.5; P.lente = 'main'; P.mainId = null; P.virtTentada = false;
   document.body.classList.add('cam-aberta');
   $cam.hidden = false;
   $cam.innerHTML = '<video class="cv" playsinline muted autoplay></video><div class="flash"></div><div class="ctop"></div><div class="zbar"></div><div class="cbot"></div><div class="ctrans" hidden></div><div class="csheet" hidden></div>';

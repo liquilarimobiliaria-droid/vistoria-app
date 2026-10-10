@@ -16,7 +16,7 @@ import * as Cont from './contestar.js';
 import * as Fluxo from './fluxo.js';
 import * as Push from './push.js';
 
-const VERSAO = '3.7';
+const VERSAO = '3.8';
 S.versao = VERSAO;
 
 /* ---------- roteador ---------- */
@@ -523,6 +523,7 @@ function viewCfg() {
       <div class="card"><b>Instalar no celular</b>
         <p class="muted"><b>Android (Chrome):</b> menu ⋮ › “Instalar app”.<br><b>iPhone (Safari):</b> botão Compartilhar › “Adicionar à Tela de Início”.<br>Abra o app uma vez com internet para ele funcionar depois sem sinal.</p></div>
       <p class="muted">Versão ${VERSAO}</p>
+      <button class="btn" data-act="atualizarApp">Buscar atualização do app</button>
     </main>`, viewCfg);
   pushCard();
   (async () => {
@@ -881,6 +882,10 @@ const ACTS = {
       } catch (e) { L.push(`pedido ${w}x${h} → erro ${e.name}`); }
     }
     box.textContent = L.join('\n');
+  },
+  async atualizarApp() { // limpa o cache dos arquivos do app (não mexe nas vistorias) e recarrega com a versão mais nova
+    try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); } catch { /* segue */ }
+    location.reload();
   },
   async camLentes() { // uma imagem por lente/zoom: serve para descobrir qual lente o navegador entrega em cada botão
     const box = document.getElementById('camrel'), gal = document.getElementById('camfotos'); if (!box || !gal) return;

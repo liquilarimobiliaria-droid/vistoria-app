@@ -281,6 +281,21 @@ body.cam-aberta { overflow: hidden; }
 .rbtn.pr { background: #000b; border-color: var(--or); min-width: 96px; }
 .rap .cthumbs .th { width: 38px; height: 38px; }
 .rap .shutter { width: 68px; height: 68px; }
+/* a imagem aparece inteira (igual à câmera do celular): o que você vê é exatamente o que é salvo, 4:3, sem corte */
+#cam:has(.rap) .cv { object-fit: contain; }
+/* paisagem: a imagem 4:3 ocupa o centro; as faixas pretas laterais ficam para os botões (nada cobre a foto) */
+@media (orientation: landscape) and (max-height: 560px) {
+  .cbot:has(.rap) { top: 0; left: auto; right: 0; bottom: 0; width: max(124px, calc((100vw - 133.33vh) / 2)); padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) 8px; background: none; justify-content: center; }
+  #cam:has(.rap) .ctop { left: 0; right: 0; background: linear-gradient(#0009, #0000); }
+  #cam:has(.rap) .zbar { right: auto; left: calc(8px + env(safe-area-inset-left)); top: 50%; transform: translateY(-50%); }
+  .rap { display: flex; flex-direction: column; align-items: stretch; gap: 8px; height: 100%; justify-content: center; }
+  .rl, .rr { display: contents; }
+  .rbtn.pr { order: 1; width: 100%; }
+  .rap .shutter { order: 2; align-self: center; }
+  .rb { order: 3; flex-direction: column; }
+  .rbtn { width: 100%; min-height: 40px; }
+  .rap .cthumbs { order: 4; justify-content: center; }
+}
 .cctl { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .cctl.fim { flex-wrap: wrap; }
 .cside { flex: 1; min-height: 52px; border-radius: 14px; border: 1px solid #ffffff40; background: #ffffff14; color: #f5f3ec; font: 500 15px/1 Pop, sans-serif; cursor: pointer; }

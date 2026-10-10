@@ -1,5 +1,5 @@
 // Cache do app para uso offline. Troque VERSAO ao publicar mudanças.
-const VERSAO = 'ql-v3.7';
+const VERSAO = 'ql-v3.8';
 const ARQUIVOS = ['./', './index.html', './style.css', './app.js', './core.js', './db.js', './templates.js', './modelos.js', './wizard.js', './passeio.js', './nuvem.js', './contestar.js', './fluxo.js', './imgworker.js', './push.js', './config.js', './export.js', './report.js', './zip.js', './voice.js',
   './vendor/supabase.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png', './img/logo-horizontal.png',
