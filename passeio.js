@@ -2,11 +2,13 @@
 // Fluxo por item: fotografar → condição (roda de seleção) → (quantidade, verificação) → próximo.
 // Ao fechar um ambiente o app pergunta se há algo mais a incluir (registros extras, para nomear depois) e mostra uma transição.
 // Se a câmera do app não abrir (permissão/navegador), o obturador vira "abrir a câmera do celular".
-import { S, geo, esc, toast, cfg, salvarCfg, lista, achaAmb, achaItem, midiaDoItem, itemFeito, faltaVerif, salvarV, addMidia, labelCond, p3, thumbURL, escolher, souDono } from './core.js';
+import { S, geo, esc, toast, cfg, salvarCfg, lista, achaAmb, achaItem, midiaDoItem, itemFeito, faltaVerif, salvarV, addMidia, labelCond, p3, thumbURL, escolher, souDono, aplicarPadrao } from './core.js';
 import { CONDICOES, VERIFICACOES, uid } from './templates.js';
 import * as Voice from './voice.js';
 
 const $cam = document.getElementById('cam');
+// iPhone/iPad: o takePhoto do Safari é lento (~1 s) e devolve a foto de lado; o quadro do vídeo sai certo e rápido (medido)
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const P = {
   aberto: false, steps: [], i: 0, stream: null, track: null, ic: null, caps: {}, camOk: false, camErro: '', modoVideo: false, rec: null, chunks: [], recT: null,
   token: 0, busy: false, autoT: null, ultimaAmb: null, ditando: false, torch: false, lista: false, cv: null, escutando: 0, mostrarCampos: false,
@@ -56,7 +58,8 @@ async function iniciarCamera(comAudio = false, deviceId = null, manterZoom = fal
     // Com ImageCapture (Android/Chrome) a prévia pode ser leve (720p, fluida) porque a foto sai em resolução total do sensor.
     // Sem ele (iPhone/Safari) a foto é um quadro da prévia, então a prévia precisa de 1080p.
     const temStill = typeof ImageCapture !== 'undefined' && !!ImageCapture.prototype?.takePhoto;
-    const alt = cfg.camRes === 720 ? [1280, 720] : cfg.camRes === 0 ? [4096, 3072] : [1920, 1080]; // 1080p: se a foto do sensor falhar, o quadro da prévia ainda tem boa resolução
+    // iPhone: 4:3 (sensor inteiro, campo de visão maior) em ~2560x1920; as fotos são guardadas em até 2400 px (Configurações)
+    const alt = cfg.camRes === 720 ? [1280, 720] : cfg.camRes === 0 ? [4032, 3024] : IOS ? [2560, 1920] : [1920, 1080];
     const video = { width: { ideal: alt[0] }, height: { ideal: alt[1] }, frameRate: { ideal: 30, max: 30 } };
     if (deviceId) video.deviceId = { exact: deviceId }; else video.facingMode = { ideal: 'environment' };
     P.stream = await navigator.mediaDevices.getUserMedia({ video, audio: comAudio });
@@ -64,7 +67,7 @@ async function iniciarCamera(comAudio = false, deviceId = null, manterZoom = fal
     await P.cv.play().catch(() => {});
     P.track = P.stream.getVideoTracks()[0];
     P.caps = P.track.getCapabilities ? P.track.getCapabilities() : {};
-    P.ic = 'ImageCapture' in window ? new ImageCapture(P.track) : null;
+    P.ic = !IOS && 'ImageCapture' in window ? new ImageCapture(P.track) : null;
     P.camOk = true; P.camErro = ''; P.torch = false; P.digital = 1; P.cv.style.transform = '';
     if (!deviceId && !P.mainId) P.mainId = P.track.getSettings?.().deviceId || null;
     await descobrirLentes();
@@ -358,7 +361,7 @@ function presetar(c) {
 }
 function proximo() {
   const c = ctx(), k = P.i + 1;
-  if (c && !c.it.na && !P.gate) {
+  if (c && !c.it.na && !P.gate && !cfg.rapido) { // modo rápido: sem exigências no meio do passeio; o padrão e as exceções vêm no fim
     const m = falhaQualidade(c.it);
     if (m) {
       if (P.qAviso?.id === c.it.id && Date.now() - P.qAviso.t < 7000) { c.it.semDetalhe = true; salvarV(); }   // segunda tentativa: segue mesmo assim e fica marcado
@@ -543,7 +546,7 @@ function renderTop() {
   const titulo = P.extra ? `Registros extras · ${esc(achaAmb(P.extra.ambId)?.nome || '')}` : P.perg ? esc(P.perg.nome) : c ? `A${p3(c.s.ai + 1)} · ${esc(c.a.nome)}` : 'Fim do roteiro';
   top.innerHTML = `<div class="ctrow">
       <button class="cb" data-p="fechar" aria-label="Sair do passeio">✕</button>
-      <div class="ctinfo"><b>${titulo}</b><small>${Math.min(P.i + 1, total)} de ${total}</small></div>
+      <div class="ctinfo"><b>${titulo}</b><small>${c && !P.perg && !P.extra ? esc(nomeCompleto(c.a, c.it)) + ' · ' : ''}${Math.min(P.i + 1, total)} de ${total}</small></div>
       <button class="cb" data-p="lista" aria-label="Roteiro">☰</button>
       <button class="cb ${cfg.falar ? 'on' : ''}" data-p="falar" aria-label="Voz do roteiro">🔊</button>
       ${Voice.ok ? `<button class="cb ${cfg.comandos ? 'on' : ''}" data-p="comandos" aria-label="Comandos por voz">🎙</button>` : ''}
@@ -621,6 +624,18 @@ function renderBottom() {
   const { a, it } = c;
   const ms = midiaDoItem(it.id);
   const gravando = !!P.rec;
+  if (cfg.rapido) { // modo rápido: só a câmera. Nome do item no topo; aqui só o disparo e a navegação
+    bot.innerHTML = `
+      ${P.camErro ? `<div class="aviso">${esc(P.camErro)}</div>` : ''}
+      <div class="cthumbs">${ms.slice(-4).map((f) => `<span class="thw"><img class="th" src="${thumbURL(f)}" alt="">${f.vertical ? '<i class="vert">⚠</i>' : ''}</span>`).join('')}${ms.length ? `<small>${ms.length}</small>` : ''}${P.pend[it.id] ? '<small class="aviso-s">…</small>' : ''}</div>
+      <div class="cshut"><button class="shutter ${P.modoVideo ? 'vid' : ''} ${gravando ? 'rec' : ''}" data-p="shutter" aria-label="Fotografar">${gravando ? '■' : ''}</button></div>
+      <div class="cctl3">
+        <button class="cbig" data-p="voltar" ${P.i === 0 ? 'disabled' : ''}>‹</button>
+        <button class="cbig na" data-p="na">Não tem</button>
+        <button class="cbig" data-p="proximo">Próximo ›</button>
+      </div>`;
+    return;
+  }
   bot.innerHTML = `
     <div class="hhint">↔ Fotos sempre na horizontal</div>
     <div class="cprompt" data-p="repetir" title="Toque para ouvir de novo">${esc(frase(a, it))} <span class="ear">🔊</span></div>
@@ -837,8 +852,13 @@ export function fechar(silencioso = false) {
   $cam.innerHTML = '';
   if (!silencioso && S.V) {
     const id = S.V.id;
-    if (P.proc || P.fila.length) { toast('Salvando as últimas fotos…', 3000); esvaziarFila().then(() => { location.hash = '#/v/' + id; }); }
-    else location.hash = '#/v/' + id;
+    let destino = '#/v/' + id;
+    if (cfg.rapido) { // fim do passeio rápido: aplica o padrão (Bom/Testado; pintura = Pintura nova) e leva à conferência das exceções
+      const n = aplicarPadrao(S.V); salvarV();
+      if (n) { toast(`Padrão aplicado a ${n} itens. Confira só as exceções.`, 5000); destino = '#/v/' + id + '/revisao'; }
+    }
+    if (P.proc || P.fila.length) { toast('Salvando as últimas fotos…', 3000); esvaziarFila().then(() => { location.hash = destino; }); }
+    else location.hash = destino;
   }
 }
 export const aberto = () => P.aberto;

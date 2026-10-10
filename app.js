@@ -16,7 +16,7 @@ import * as Cont from './contestar.js';
 import * as Fluxo from './fluxo.js';
 import * as Push from './push.js';
 
-const VERSAO = '3.5';
+const VERSAO = '3.6';
 S.versao = VERSAO;
 
 /* ---------- roteador ---------- */
@@ -484,6 +484,11 @@ function viewCfg() {
           <option value="1600" ${cfg.maxPx === 1600 ? 'selected' : ''}>Leve (1600 px)</option>
           <option value="2400" ${cfg.maxPx === 2400 ? 'selected' : ''}>Padrão (2400 px) — recomendado</option>
           <option value="0" ${cfg.maxPx === 0 ? 'selected' : ''}>Original da câmera (ocupa mais espaço)</option>
+        </select></label>
+      <label>Modo do passeio
+        <select data-chg="cfgRapido">
+          <option value="1" ${cfg.rapido ? 'selected' : ''}>Rápido — só a câmera; padrão Bom/Testado aplicado no fim (recomendado)</option>
+          <option value="0" ${!cfg.rapido ? 'selected' : ''}>Completo — marcar condição de cada item na hora</option>
         </select></label>
       <label>Limite de vídeos por ambiente<input type="number" min="0" max="30" data-chg="cfgVid" value="${cfg.maxVideos}"></label>
       <label>Qualidade da prévia da câmera do app
@@ -1022,6 +1027,7 @@ $app.addEventListener('change', async (e) => {
     if (k.startsWith('ppapel:')) { await Nuvem.atualizarPerfil(k.slice(7), { papel: el.value }); toast('Papel atualizado'); return; }
     if (k.startsWith('pativo:')) { await Nuvem.atualizarPerfil(k.slice(7), { ativo: el.checked }); toast(el.checked ? 'Acesso ativado' : 'Acesso desativado'); return; }
     if (k === 'cfgVist') { cfg.vistoriador = el.value.trim(); salvarCfg(); return; }
+    if (k === 'cfgRapido') { cfg.rapido = el.value === '1'; salvarCfg(); toast(cfg.rapido ? 'Passeio rápido ligado' : 'Passeio completo'); return; }
     if (k === 'cfgPx') { cfg.maxPx = Number(el.value); salvarCfg(); toast('Vale para as próximas fotos'); return; }
     if (k === 'cfgFalar') { cfg.falar = el.checked; salvarCfg(); return; }
     if (k === 'cfgVoz') { cfg.voz = el.value || ''; salvarCfg(); return; }

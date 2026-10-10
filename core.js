@@ -21,6 +21,7 @@ export const RANK_COND = { PINTURA_NOVA: 0, BOM: 0, REGULAR: 1, AVARIA: 2 };
 
 export const cfg = (() => { try { return JSON.parse(localStorage.getItem('ql-cfg')) || {}; } catch { return {}; } })();
 if (cfg.maxPx === undefined) cfg.maxPx = 2400;
+if (cfg.rapido === undefined) cfg.rapido = true; // passeio só com a câmera; padrão aplicado no fim
 if (cfg.maxVideos === undefined) cfg.maxVideos = 5;
 if (cfg.falar === undefined) cfg.falar = true;
 if (cfg.auto === undefined) cfg.auto = true;
@@ -88,6 +89,27 @@ export function itemFeito(i) {
   return !!i.cond;
 }
 export const faltaVerif = (i) => !i.na && i.t && !i.verif;
+
+/* Padrão de fim de passeio rápido: itens fotografados e ainda sem marcação ficam Bom/Testado;
+   superfície pintada na entrada = Pintura nova; na saída, repete o estado da entrada quando existe. O usuário só altera exceções. */
+export function aplicarPadrao(V) {
+  let n = 0;
+  for (const a of V.ambientes) {
+    for (const { it } of lista(a)) {
+      if (it.na || it.g || it.m) continue;
+      if (!(midiaDoItem(it.id).length || it.nf)) continue;
+      let mudou = false;
+      if (!it.cond) {
+        it.cond = V.tipoVistoria === 'Entrada' ? (it.p ? 'PINTURA_NOVA' : 'BOM') : (it.ref?.cond || (it.p ? 'PINTURA_NOVA' : 'BOM'));
+        if (it.cond === 'PINTURA_NOVA' && !it.p) it.cond = 'BOM';
+        mudou = true;
+      }
+      if (it.t && !it.verif) { it.verif = 'TESTADO'; mudou = true; }
+      if (mudou) n++;
+    }
+  }
+  return n;
+}
 
 /* ---------- geolocalização ---------- */
 export const geo = { watch: null, last: null, erro: null };
